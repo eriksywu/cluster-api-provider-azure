@@ -136,6 +136,15 @@ func InitFlags(fs *pflag.FlagSet) {
 func main() {
 	InitFlags(pflag.CommandLine)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+
+	//carp
+	var metricsAddr string
+	var enableLeaderElection bool
+	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
+
 	pflag.Parse()
 
 	if watchNamespace != "" {
@@ -191,6 +200,22 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("azurecluster-reconciler"),
 		}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: azureClusterConcurrency}); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "AzureCluster")
+			os.Exit(1)
+		}
+		if err = (&controllers.ManagedClusterReconciler{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("ManagedCluster"),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ManagedCluster")
+			os.Exit(1)
+		}
+		if err = (&controllers.ManagedControlPlaneReconciler{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("ManagedControlPlane"),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ManagedControlPlane")
 			os.Exit(1)
 		}
 	} else {
